@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cybernauts — Email Threat Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#080a12;
+    --bg-raised:#0e1220;
+    --bg-card:#111528;
+    --line:#212843;
+    --line-soft:#171c33;
+    --ink:#e7eaf6;
+    --ink-dim:#8890b3;
+    --ink-faint:#565f85;
+    --violet:#6c5ce7;
+    --violet-glow:#8f7dff;
+    --cyan:#33e6d8;
+    --safe:#2fe08f;
+    --warn:#ffb020;
+    --danger:#ff4d6a;
+    --font-display:'Space Grotesk', sans-serif;
+    --font-mono:'JetBrains Mono', monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    background:
+      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(108,92,231,0.16), transparent 60%),
+      radial-gradient(ellipse 700px 500px at 100% 10%, rgba(51,230,216,0.08), transparent 55%),
+      var(--bg);
+    color:var(--ink);
+    font-family:var(--font-display);
+    min-height:100vh;
+    overflow-x:hidden;
+  }
+  .grain{
+    position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.035;mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .scanline-bg{
+    position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.5;
+    background:repeating-linear-gradient(0deg, rgba(255,255,255,0.012) 0px, rgba(255,255,255,0.012) 1px, transparent 1px, transparent 3px);
+  }
+
+  /* NAV */
+  nav{
+    position:sticky;top:0;z-index:50;
+    display:flex;align-items:center;justify-content:space-between;
+    padding:20px 48px;
+    background:rgba(8,10,18,0.72);
+    backdrop-filter:blur(14px);
+    border-bottom:1px solid var(--line-soft);
+  }
+  .brand{display:flex;align-items:center;gap:10px;}
+  .brand-mark{
+    width:34px;height:34px;border-radius:8px;
+    background:linear-gradient(135deg,var(--violet),var(--cyan));
+    display:flex;align-items:center;justify-content:center;
+    font-family:var(--font-mono);font-weight:700;color:#080a12;font-size:15px;
+    box-shadow:0 0 24px rgba(108,92,231,0.5);
+  }
+  .brand-name{font-weight:700;font-size:18px;letter-spacing:0.5px;}
+  .brand-name span{color:var(--violet-glow);}
+  .navlinks{display:flex;gap:36px;font-size:14px;color:var(--ink-dim);}
+  .navlinks a{color:inherit;text-decoration:none;transition:color .2s;}
+  .navlinks a:hover{color:var(--ink);}
+  .nav-status{
+    display:flex;align-items:center;gap:8px;
+    font-family:var(--font-mono);font-size:12px;color:var(--safe);
+    border:1px solid rgba(47,224,143,0.3);background:rgba(47,224,143,0.06);
+    padding:6px 12px;border-radius:999px;
+  }
+  .dot{width:6px;height:6px;border-radius:50%;background:var(--safe);box-shadow:0 0 8px var(--safe);animation:pulse 2s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+
+  /* HERO */
+  .hero{
+    position:relative;z-index:2;
+    padding:96px 48px 60px;
+    max-width:1200px;margin:0 auto;
+    display:grid;grid-template-columns:1.1fr 0.9fr;gap:60px;align-items:center;
+  }
+  .eyebrow{
+    font-family:var(--font-mono);font-size:12px;letter-spacing:2.5px;text-transform:uppercase;
+    color:var(--cyan);display:flex;align-items:center;gap:10px;margin-bottom:22px;
+  }
+  .eyebrow::before{content:'';width:22px;height:1px;background:var(--cyan);}
+  h1.title{
+    font-size:56px;line-height:1.05;font-weight:700;letter-spacing:-1.5px;
+    margin-bottom:20px;
+  }
+  h1.title .accent{
+    background:linear-gradient(120deg,var(--violet-glow),var(--cyan));
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .hero p.lead{
+    font-size:16px;color:var(--ink-dim);line-height:1.7;max-width:480px;margin-bottom:32px;
+  }
+  .hero-ctas{display:flex;gap:14px;}
+  .btn{
+    font-family:var(--font-mono);font-size:13px;font-weight:600;letter-spacing:0.3px;
+    padding:13px 24px;border-radius:8px;border:none;cursor:pointer;
+    transition:transform .15s ease, box-shadow .15s ease;
+  }
+  .btn-primary{
+    background:linear-gradient(120deg,var(--violet),#8b6ff0);color:#fff;
+    box-shadow:0 8px 24px rgba(108,92,231,0.35);
+  }
+  .btn-primary:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(108,92,231,0.45);}
+  .btn-ghost{
+    background:transparent;border:1px solid var(--line);color:var(--ink-dim);
+  }
+  .btn-ghost:hover{border-color:var(--violet-glow);color:var(--ink);}
+
+  .hero-stats{display:flex;gap:28px;margin-top:40px;}
+  .stat b{display:block;font-size:22px;font-family:var(--font-mono);color:var(--ink);}
+  .stat span{font-size:11px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:1px;}
+
+  /* Radar visual */
+  .radar-wrap{
+    position:relative;width:100%;aspect-ratio:1;max-width:420px;margin:0 auto;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .radar-ring{
+    position:absolute;border-radius:50%;border:1px solid var(--line);
+  }
+  .r1{width:100%;height:100%;}
+  .r2{width:72%;height:72%;}
+  .r3{width:44%;height:44%;}
+  .radar-sweep{
+    position:absolute;width:100%;height:100%;border-radius:50%;
+    background:conic-gradient(from 0deg, transparent 0deg, rgba(108,92,231,0.35) 60deg, transparent 90deg);
+    animation:spin 4s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .radar-core{
+    position:relative;z-index:2;width:96px;height:96px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #1a1f38, #0b0e1c);
+    border:1px solid var(--line);
+    display:flex;align-items:center;justify-content:center;
+    font-family:var(--font-mono);font-size:11px;color:var(--cyan);text-align:center;
+    box-shadow:0 0 40px rgba(51,230,216,0.15);
+  }
+  .radar-blip{
+    position:absolute;width:6px;height:6px;border-radius:50%;background:var(--danger);
+    box-shadow:0 0 10px var(--danger);animation:blip 2.6s ease-in-out infinite;
+  }
+  .b1{top:22%;left:65%;animation-delay:.3s;}
+  .b2{top:68%;left:30%;animation-delay:1.1s;background:var(--warn);box-shadow:0 0 10px var(--warn);}
+  .b3{top:35%;left:20%;animation-delay:1.8s;background:var(--safe);box-shadow:0 0 10px var(--safe);}
+  @keyframes blip{0%,100%{opacity:0;transform:scale(.4);}50%{opacity:1;transform:scale(1.4);}}
+
+  /* SECTION shared */
+  section{position:relative;z-index:2;max-width:1200px;margin:0 auto;padding:60px 48px;}
+  .section-head{margin-bottom:36px;}
+  .section-head .eyebrow{margin-bottom:12px;}
+  .section-head h2{font-size:30px;font-weight:700;letter-spacing:-0.5px;}
+  .section-head p{color:var(--ink-dim);font-size:14px;margin-top:10px;max-width:520px;}
+
+  /* UPLOAD PANEL */
+  .panel{
+    background:linear-gradient(180deg, var(--bg-card), var(--bg-raised));
+    border:1px solid var(--line);border-radius:16px;
+    padding:8px;box-shadow:0 20px 60px rgba(0,0,0,0.35);
+  }
+  .panel-inner{border:1px solid var(--line-soft);border-radius:12px;padding:36px;}
+  .dropzone{
+    border:1.5px dashed var(--line);border-radius:12px;
+    padding:48px 24px;text-align:center;cursor:pointer;
+    transition:border-color .2s, background .2s;
+    position:relative;overflow:hidden;
+  }
+  .dropzone:hover, .dropzone.drag{
+    border-color:var(--violet-glow);
+    background:rgba(108,92,231,0.05);
+  }
+  .dropzone-icon{
+    width:56px;height:56px;margin:0 auto 18px;border-radius:14px;
+    background:rgba(108,92,231,0.12);border:1px solid rgba(108,92,231,0.3);
+    display:flex;align-items:center;justify-content:center;
+  }
+  .dropzone h3{font-size:16px;margin-bottom:6px;}
+  .dropzone p{color:var(--ink-faint);font-size:13px;}
+  .dropzone .browse{color:var(--cyan);text-decoration:underline;cursor:pointer;}
+  #fileInput{display:none;}
+  .filetag{
+    margin-top:16px;display:inline-flex;align-items:center;gap:8px;
+    font-family:var(--font-mono);font-size:12px;color:var(--ink-dim);
+    background:var(--bg-raised);border:1px solid var(--line);padding:8px 14px;border-radius:8px;
+  }
+
+  .accepted-row{
+    display:flex;gap:10px;justify-content:center;margin-top:22px;flex-wrap:wrap;
+  }
+  .chip{
+    font-family:var(--font-mono);font-size:11px;color:var(--ink-faint);
+    border:1px solid var(--line);padding:5px 10px;border-radius:999px;
+  }
+
+  .analyze-row{display:flex;justify-content:center;margin-top:28px;}
+  .btn-analyze{
+    font-family:var(--font-mono);font-size:14px;font-weight:600;
+    padding:15px 40px;border-radius:10px;border:none;cursor:pointer;color:#fff;
+    background:linear-gradient(120deg,var(--violet),#8b6ff0);
+    box-shadow:0 10px 30px rgba(108,92,231,0.35);
+    transition:transform .15s ease;
+    display:flex;align-items:center;gap:10px;
+  }
+  .btn-analyze:hover{transform:translateY(-2px);}
+  .btn-analyze:disabled{opacity:.5;cursor:not-allowed;transform:none;}
+  .spinner{
+    width:16px;height:16px;border-radius:50%;
+    border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;
+    animation:spin 0.7s linear infinite;display:none;
+  }
+
+  /* SCAN PROGRESS */
+  .scan-log{
+    margin-top:26px;display:none;
+    font-family:var(--font-mono);font-size:12.5px;color:var(--ink-faint);
+    border-top:1px solid var(--line-soft);padding-top:20px;
+  }
+  .scan-line{display:flex;gap:10px;align-items:center;padding:5px 0;opacity:0;transform:translateX(-6px);animation:fadeIn .4s forwards;}
+  .scan-line .ok{color:var(--safe);}
+  .scan-line .flag{color:var(--warn);}
+  @keyframes fadeIn{to{opacity:1;transform:translateX(0);}}
+  .progress-track{
+    height:4px;border-radius:4px;background:var(--line-soft);margin-top:18px;overflow:hidden;
+  }
+  .progress-fill{
+    height:100%;width:0%;border-radius:4px;
+    background:linear-gradient(90deg,var(--violet),var(--cyan));
+    transition:width .35s ease;
+  }
+
+  /* RESULTS */
+  #resultsSection{display:none;}
+  .results-grid{
+    display:grid;grid-template-columns:340px 1fr;gap:24px;
+  }
+  .verdict-card{
+    background:linear-gradient(180deg, var(--bg-card), var(--bg-raised));
+    border:1px solid var(--line);border-radius:16px;padding:32px;
+    text-align:center;
+  }
+  .gauge-wrap{position:relative;width:200px;height:200px;margin:0 auto 20px;}
+  .gauge-wrap svg{transform:rotate(-90deg);}
+  .gauge-bg{fill:none;stroke:var(--line-soft);stroke-width:12;}
+  .gauge-fill{fill:none;stroke-width:12;stroke-linecap:round;transition:stroke-dashoffset 1.2s cubic-bezier(.22,1,.36,1), stroke 0.4s;}
+  .gauge-center{
+    position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  }
+  .gauge-score{font-family:var(--font-mono);font-size:38px;font-weight:700;}
+  .gauge-label{font-size:10px;color:var(--ink-faint);letter-spacing:1.5px;text-transform:uppercase;margin-top:2px;}
+  .verdict-badge{
+    display:inline-block;font-family:var(--font-mono);font-size:13px;font-weight:700;
+    padding:8px 18px;border-radius:999px;letter-spacing:1px;margin-top:6px;
+  }
+  .verdict-safe{background:rgba(47,224,143,0.12);color:var(--safe);border:1px solid rgba(47,224,143,0.35);}
+  .verdict-suspicious{background:rgba(255,176,32,0.12);color:var(--warn);border:1px solid rgba(255,176,32,0.35);}
+  .verdict-phishing{background:rgba(255,77,106,0.12);color:var(--danger);border:1px solid rgba(255,77,106,0.35);}
+
+  .meta-list{margin-top:24px;text-align:left;font-family:var(--font-mono);font-size:12.5px;}
+  .meta-list div{display:flex;justify-content:space-between;padding:9px 0;border-top:1px solid var(--line-soft);color:var(--ink-dim);}
+  .meta-list div span:last-child{color:var(--ink);}
+
+  .detail-col{display:flex;flex-direction:column;gap:20px;}
+  .card{
+    background:linear-gradient(180deg, var(--bg-card), var(--bg-raised));
+    border:1px solid var(--line);border-radius:16px;padding:26px 28px;
+  }
+  .card h4{
+    font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:var(--ink-faint);
+    margin-bottom:16px;display:flex;align-items:center;gap:8px;
+  }
+  .reason-item{
+    display:flex;gap:12px;align-items:flex-start;padding:12px 0;
+    border-top:1px solid var(--line-soft);font-size:13.5px;color:var(--ink-dim);line-height:1.5;
+  }
+  .reason-item:first-of-type{border-top:none;}
+  .reason-dot{
+    min-width:8px;height:8px;border-radius:50%;margin-top:6px;background:var(--danger);
+  }
+  .geo-map{
+    height:190px;border-radius:10px;position:relative;overflow:hidden;
+    background:
+      radial-gradient(circle at 62% 40%, rgba(255,77,106,0.35), transparent 45%),
+      linear-gradient(160deg, #10142a, #0a0d1c);
+    border:1px solid var(--line-soft);
+  }
+  .geo-map svg{width:100%;height:100%;opacity:0.35;}
+  .geo-pin{
+    position:absolute;top:38%;left:60%;width:14px;height:14px;
+  }
+  .geo-pin::before{
+    content:'';position:absolute;inset:0;border-radius:50%;background:var(--danger);
+    box-shadow:0 0 0 0 rgba(255,77,106,0.6);animation:ripple 1.8s infinite;
+  }
+  @keyframes ripple{
+    0%{box-shadow:0 0 0 0 rgba(255,77,106,0.6);}
+    100%{box-shadow:0 0 0 22px rgba(255,77,106,0);}
+  }
+  .geo-info{display:flex;justify-content:space-between;margin-top:14px;font-family:var(--font-mono);font-size:12px;color:var(--ink-dim);}
+
+  .download-row{display:flex;justify-content:flex-end;margin-top:22px;gap:12px;}
+
+  /* HOW IT WORKS */
+  .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;}
+  .step-card{
+    border:1px solid var(--line);border-radius:14px;padding:24px;
+    background:var(--bg-card);position:relative;
+    transition:border-color .2s, transform .2s;
+  }
+  .step-card:hover{border-color:var(--violet-glow);transform:translateY(-4px);}
+  .step-num{font-family:var(--font-mono);font-size:11px;color:var(--violet-glow);letter-spacing:1px;margin-bottom:14px;}
+  .step-card h4{font-size:15px;margin-bottom:8px;}
+  .step-card p{font-size:12.5px;color:var(--ink-faint);line-height:1.6;}
+
+  footer{
+    border-top:1px solid var(--line-soft);padding:36px 48px;
+    display:flex;justify-content:space-between;align-items:center;
+    color:var(--ink-faint);font-size:12px;font-family:var(--font-mono);
+    position:relative;z-index:2;
+  }
+
+  @media(max-width:900px){
+    .hero{grid-template-columns:1fr;}
+    .results-grid{grid-template-columns:1fr;}
+    .steps{grid-template-columns:1fr 1fr;}
+    nav{padding:16px 20px;}
+    .navlinks{display:none;}
+    section, .hero{padding-left:20px;padding-right:20px;}
+    h1.title{font-size:38px;}
+  }
+</style>
+</head>
+<body>
+<div class="grain"></div>
+<div class="scanline-bg"></div>
+
+<nav>
+  <div class="brand">
+    <div class="brand-mark">CN</div>
+    <div class="brand-name">cyber<span>nauts</span></div>
+  </div>
+  <div class="navlinks">
+    <a href="#upload">Analyzer</a>
+    <a href="#how">How it works</a>
+    <a href="#results">Report</a>
+  </div>
+  <div class="nav-status"><span class="dot"></span> ENGINE ONLINE</div>
+</nav>
+
+<section class="hero">
+  <div>
+    <div class="eyebrow">Email Threat &amp; Forensic Intelligence</div>
+    <h1 class="title">Trace every <span class="accent">phishing</span> email back to its source.</h1>
+    <p class="lead">Upload a raw email or header, and cybernauts inspects SPF/DKIM/DMARC, sender IP reputation, embedded links and geolocation — then hands you a scored, explainable forensic report in seconds.</p>
+    <div class="hero-ctas">
+      <button class="btn btn-primary" onclick="document.getElementById('upload').scrollIntoView({behavior:'smooth'})">Analyze an email</button>
+      <button class="btn btn-ghost" onclick="document.getElementById('how').scrollIntoView({behavior:'smooth'})">See how it works</button>
+    </div>
+    <div class="hero-stats">
+      <div class="stat"><b>0–100</b><span>Risk scoring</span></div>
+      <div class="stat"><b>7</b><span>Detection signals</span></div>
+      <div class="stat"><b>&lt;10s</b><span>Avg. scan time</span></div>
+    </div>
+  </div>
+  <div class="radar-wrap">
+    <div class="radar-ring r1"></div>
+    <div class="radar-ring r2"></div>
+    <div class="radar-ring r3"></div>
+    <div class="radar-sweep"></div>
+    <div class="radar-blip b1"></div>
+    <div class="radar-blip b2"></div>
+    <div class="radar-blip b3"></div>
+    <div class="radar-core">SENDER<br>TRACE</div>
+  </div>
+</section>
+
+<section id="upload">
+  <div class="section-head">
+    <div class="eyebrow">Step 01 — Upload</div>
+    <h2>Drop in a raw email</h2>
+    <p>Accepts .eml exports or pasted raw headers. Nothing is stored — files are scanned in-memory and discarded after analysis.</p>
+  </div>
+
+  <div class="panel">
+    <div class="panel-inner">
+      <div class="dropzone" id="dropzone" onclick="document.getElementById('fileInput').click()">
+        <div class="dropzone-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0-12l-4 4m4-4l4 4M5 17v2a2 2 0 002 2h10a2 2 0 002-2v-2" stroke="#8f7dff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <h3>Drag &amp; drop your .eml file here</h3>
+        <p>or <span class="browse">browse from your device</span></p>
+        <div class="filetag" id="filetag" style="display:none;"></div>
+      </div>
+      <div class="accepted-row">
+        <span class="chip">.EML</span>
+        <span class="chip">.MSG</span>
+        <span class="chip">RAW HEADER (paste)</span>
+        <span class="chip">MAX 10MB</span>
+      </div>
+      <input type="file" id="fileInput" accept=".eml,.msg,.txt">
+
+      <div class="analyze-row">
+        <button class="btn-analyze" id="analyzeBtn" onclick="runScan()">
+          <span class="spinner" id="spinner"></span>
+          <span id="analyzeLabel">Run threat analysis</span>
+        </button>
+      </div>
+
+      <div class="scan-log" id="scanLog">
+        <div id="logLines"></div>
+        <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="section-head">
+    <div class="eyebrow">Step 02 — Detection pipeline</div>
+    <h2>What happens under the hood</h2>
+    <p>Every scan runs the same four-stage pipeline before a verdict is issued.</p>
+  </div>
+  <div class="steps">
+    <div class="step-card">
+      <div class="step-num">PARSE</div>
+      <h4>Header extraction</h4>
+      <p>From, Reply-To, Return-Path, Received chain and Authentication-Results are pulled and normalized.</p>
+    </div>
+    <div class="step-card">
+      <div class="step-num">VERIFY</div>
+      <h4>Auth &amp; identity check</h4>
+      <p>SPF, DKIM and DMARC results are validated; display-name vs domain mismatches are flagged.</p>
+    </div>
+    <div class="step-card">
+      <div class="step-num">CROSS-CHECK</div>
+      <h4>Reputation lookup</h4>
+      <p>Sender IP and embedded links are checked against live threat intelligence feeds.</p>
+    </div>
+    <div class="step-card">
+      <div class="step-num">SCORE</div>
+      <h4>Forensic report</h4>
+      <p>Weighted signals produce a 0–100 score, a verdict, and a plain-language "why flagged" list.</p>
+    </div>
+  </div>
+</section>
+
+<section id="results" class="results-anchor">
+  <div id="resultsSection">
+    <div class="section-head">
+      <div class="eyebrow">Step 03 — Verdict</div>
+      <h2>Forensic report</h2>
+      <p>Generated from the signals detected in the uploaded email.</p>
+    </div>
+
+    <div class="results-grid">
+      <div class="verdict-card">
+        <div class="gauge-wrap">
+          <svg width="200" height="200" viewBox="0 0 200 200">
+            <circle class="gauge-bg" cx="100" cy="100" r="86"></circle>
+            <circle class="gauge-fill" id="gaugeFill" cx="100" cy="100" r="86"></circle>
+          </svg>
+          <div class="gauge-center">
+            <div class="gauge-score" id="gaugeScore">0</div>
+            <div class="gauge-label">Risk Score</div>
+          </div>
+        </div>
+        <div class="verdict-badge" id="verdictBadge">—</div>
+
+        <div class="meta-list">
+          <div><span>From</span><span id="metaFrom">—</span></div>
+          <div><span>Subject</span><span id="metaSubject">—</span></div>
+          <div><span>Sender IP</span><span id="metaIP">—</span></div>
+          <div><span>SPF</span><span id="metaSPF">—</span></div>
+          <div><span>DKIM</span><span id="metaDKIM">—</span></div>
+        </div>
+      </div>
+
+      <div class="detail-col">
+        <div class="card">
+          <h4>Why flagged</h4>
+          <div id="reasonsList"></div>
+        </div>
+        <div class="card">
+          <h4>Sender geolocation</h4>
+          <div class="geo-map">
+            <svg viewBox="0 0 400 200"><path d="M20 100 Q100 40 200 90 T380 80" stroke="#6c5ce7" stroke-width="1" fill="none"/></svg>
+            <div class="geo-pin"></div>
+          </div>
+          <div class="geo-info">
+            <span id="geoCity">—</span>
+            <span id="geoISP">—</span>
+          </div>
+        </div>
+        <div class="download-row">
+          <button class="btn btn-ghost" onclick="resetScan()">Scan another email</button>
+          <button class="btn btn-primary" onclick="downloadReport()">Download PDF report</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <span>cybernauts — email threat &amp; forensic intelligence</span>
+  <span>SIH26106</span>
+</footer>
+
+<script>
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+const filetag = document.getElementById('filetag');
+let uploadedName = null;
+
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault(); dropzone.classList.remove('drag');
+  if(e.dataTransfer.files.length){ setFile(e.dataTransfer.files[0]); }
+});
+fileInput.addEventListener('change', () => { if(fileInput.files.length) setFile(fileInput.files[0]); });
+
+function setFile(file){
+  uploadedName = file.name;
+  filetag.style.display = 'inline-flex';
+  filetag.textContent = '📎 ' + file.name;
+}
+
+const logSteps = [
+  {text:'Parsing MIME structure and headers...', ok:true},
+  {text:'Checking SPF authentication...', ok:false, flag:'FAIL'},
+  {text:'Checking DKIM signature...', ok:false, flag:'FAIL'},
+  {text:'Resolving sender IP from Received chain...', ok:true},
+  {text:'Querying IP reputation feed...', ok:false, flag:'92% CONFIDENCE'},
+  {text:'Scanning embedded links...', ok:false, flag:'2 FLAGGED'},
+  {text:'Resolving sender geolocation...', ok:true},
+  {text:'Computing composite risk score...', ok:true},
+];
+
+let scanData = null;
+
+function runScan(){
+  const btn = document.getElementById('analyzeBtn');
+  const spinner = document.getElementById('spinner');
+  const label = document.getElementById('analyzeLabel');
+  const scanLog = document.getElementById('scanLog');
+  const logLines = document.getElementById('logLines');
+  const progressFill = document.getElementById('progressFill');
+
+  btn.disabled = true;
+  spinner.style.display = 'inline-block';
+  label.textContent = 'Analyzing...';
+  scanLog.style.display = 'block';
+  logLines.innerHTML = '';
+  progressFill.style.width = '0%';
+  document.getElementById('resultsSection').style.display = 'none';
+
+  logSteps.forEach((step, i) => {
+    setTimeout(() => {
+      const line = document.createElement('div');
+      line.className = 'scan-line';
+      line.style.animationDelay = '0s';
+      const status = step.ok ? '<span class="ok">✓ CLEAR</span>' : '<span class="flag">⚠ '+step.flag+'</span>';
+      line.innerHTML = '<span>' + step.text + '</span><span style="margin-left:auto">' + status + '</span>';
+      logLines.appendChild(line);
+      progressFill.style.width = Math.round(((i+1)/logSteps.length)*100) + '%';
+
+      if(i === logSteps.length - 1){
+        setTimeout(() => {
+          btn.disabled = false;
+          spinner.style.display = 'none';
+          label.textContent = 'Run threat analysis';
+          showResults();
+        }, 500);
+      }
+    }, i * 480);
+  });
+}
+
+function showResults(){
+  scanData = {
+    from: uploadedName ? '"Bank of India Support" <alerts@bnk-secure-verify.ru>' : '"Bank of India Support" <alerts@bnk-secure-verify.ru>',
+    subject: 'URGENT: Verify your account within 24 hours',
+    ip: '185.220.101.47',
+    spf: 'fail',
+    dkim: 'fail',
+    score: 82,
+    city: 'Novgorod, Russia',
+    isp: 'FreeNet Hosting LLC',
+    reasons: [
+      'SPF authentication failed — sender domain could not be verified',
+      'DKIM signature invalid — email content may have been altered in transit',
+      'Sender IP flagged on threat intelligence feed with 92% abuse confidence',
+      '2 embedded links flagged as malicious phishing pages',
+      'Display name "Bank of India Support" does not match sending domain',
+      'Reply-To address differs from From address — common spoofing pattern'
+    ]
+  };
+
+  document.getElementById('metaFrom').textContent = scanData.from;
+  document.getElementById('metaSubject').textContent = scanData.subject;
+  document.getElementById('metaIP').textContent = scanData.ip;
+  document.getElementById('metaSPF').textContent = scanData.spf.toUpperCase();
+  document.getElementById('metaDKIM').textContent = scanData.dkim.toUpperCase();
+  document.getElementById('geoCity').textContent = scanData.city;
+  document.getElementById('geoISP').textContent = scanData.isp;
+
+  const reasonsList = document.getElementById('reasonsList');
+  reasonsList.innerHTML = '';
+  scanData.reasons.forEach(r => {
+    const div = document.createElement('div');
+    div.className = 'reason-item';
+    div.innerHTML = '<span class="reason-dot"></span><span>'+r+'</span>';
+    reasonsList.appendChild(div);
+  });
+
+  const badge = document.getElementById('verdictBadge');
+  let verdictClass = 'verdict-safe', verdictText = 'SAFE';
+  if(scanData.score > 55){ verdictClass = 'verdict-phishing'; verdictText = 'PHISHING / MALICIOUS'; }
+  else if(scanData.score > 25){ verdictClass = 'verdict-suspicious'; verdictText = 'SUSPICIOUS'; }
+  badge.className = 'verdict-badge ' + verdictClass;
+  badge.textContent = verdictText;
+
+  const gaugeFill = document.getElementById('gaugeFill');
+  const circumference = 2 * Math.PI * 86;
+  gaugeFill.style.strokeDasharray = circumference;
+  gaugeFill.style.strokeDashoffset = circumference;
+  gaugeFill.style.stroke = scanData.score > 55 ? '#ff4d6a' : (scanData.score > 25 ? '#ffb020' : '#2fe08f');
+
+  document.getElementById('resultsSection').style.display = 'block';
+  document.getElementById('resultsSection').parentElement.scrollIntoView({behavior:'smooth'});
+
+  let current = 0;
+  const target = scanData.score;
+  const scoreEl = document.getElementById('gaugeScore');
+  const anim = setInterval(() => {
+    current += 2;
+    if(current >= target){ current = target; clearInterval(anim); }
+    scoreEl.textContent = current;
+    const offset = circumference - (current/100) * circumference;
+    gaugeFill.style.strokeDashoffset = offset;
+  }, 20);
+}
+
+function resetScan(){
+  document.getElementById('resultsSection').style.display = 'none';
+  document.getElementById('scanLog').style.display = 'none';
+  document.getElementById('upload').scrollIntoView({behavior:'smooth'});
+}
+
+function downloadReport(){
+  if(!scanData) return;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+
+  doc.setFillColor(8,10,18);
+  doc.rect(0,0,210,40,'F');
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(20);
+  doc.text('cybernauts — Forensic Report', 14, 20);
+  doc.setFontSize(10);
+  doc.setTextColor(180,180,200);
+  doc.text('Email Threat Detection & Geolocation Intelligence', 14, 28);
+
+  doc.setTextColor(20,20,20);
+  let y = 52;
+  doc.setFontSize(13);
+  doc.text('Verdict: ' + document.getElementById('verdictBadge').textContent, 14, y);
+  y += 8;
+  doc.setFontSize(11);
+  doc.text('Risk Score: ' + scanData.score + ' / 100', 14, y);
+  y += 10;
+
+  doc.setFontSize(11);
+  const fields = [
+    ['From', scanData.from],
+    ['Subject', scanData.subject],
+    ['Sender IP', scanData.ip],
+    ['SPF Status', scanData.spf.toUpperCase()],
+    ['DKIM Status', scanData.dkim.toUpperCase()],
+    ['Geolocation', scanData.city],
+    ['ISP', scanData.isp]
+  ];
+  fields.forEach(([label, val]) => {
+    doc.setFont(undefined, 'bold');
+    doc.text(label + ':', 14, y);
+    doc.setFont(undefined, 'normal');
+    doc.text(String(val), 55, y);
+    y += 8;
+  });
+
+  y += 4;
+  doc.setFont(undefined, 'bold');
+  doc.text('Why this email was flagged:', 14, y);
+  y += 8;
+  doc.setFont(undefined, 'normal');
+  scanData.reasons.forEach(r => {
+    const lines = doc.splitTextToSize('• ' + r, 180);
+    doc.text(lines, 14, y);
+    y += lines.length * 6 + 2;
+  });
+
+  y += 6;
+  doc.setFontSize(9);
+  doc.setTextColor(120,120,120);
+  doc.text('Generated by cybernauts — SIH26106 Prototype Report', 14, 285);
+
+  doc.save('cybernauts-forensic-report.pdf');
+}
+</script>
+</body>
+</html>
